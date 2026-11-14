@@ -1,0 +1,76 @@
+version: '3'
+
+services:
+  poll:
+    restart: always
+    build: ./poll
+    ports:
+      - "5000:80"
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - poll-tier
+
+  redis:
+    restart: always
+    image: redis:7
+    ports:
+      - "6379:6379"
+    networks:
+      - poll-tier
+      - back-tier
+       
+  worker:
+    restart: always
+    build: ./worker
+    environment:
+      - REDIS_HOST=redis
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+    depends_on:
+      - redis
+      - db
+    networks:
+      - back-tier
+
+  db:
+    restart: always
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - back-tier
+      - result-tier
+
+  result:
+    restart: always
+    build: ./result
+    ports:
+      - "5001:80"
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+    depends_on:
+      - db
+    networks:
+      - result-tier
+
+networks:
+  poll-tier:
+  result-tier:
+  back-tier:
+
+volumes:
+  db-data:
